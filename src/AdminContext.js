@@ -3,12 +3,10 @@ import { festivals as initialFestivals } from './festival';
 
 const AdminContext = createContext();
 
-// Super admin credentials are read from environment variables.
-// Create a `.env.local` (not committed) or set env vars in your environment:
-// REACT_APP_SUPERADMIN_USER and REACT_APP_SUPERADMIN_PASS
+// Default super admin credentials (in production, this would be handled by a backend)
 const SUPER_ADMIN_CREDENTIALS = {
-  username: process.env.REACT_APP_SUPERADMIN_USER || 'superadmin',
-  password: process.env.REACT_APP_SUPERADMIN_PASS || ''
+  username: 'superadmin',
+  password: 'fiesta2025!'
 };
 
 export const AdminProvider = ({ children }) => {
@@ -44,12 +42,6 @@ export const AdminProvider = ({ children }) => {
 
     // Simulate API call delay
     await new Promise(resolve => setTimeout(resolve, 1000));
-
-    // If credentials are not configured via env, block login and show helpful message.
-    if (!SUPER_ADMIN_CREDENTIALS.password) {
-      setAdminLoading(false);
-      return { success: false, error: 'Super admin credentials not configured. See .env.example' };
-    }
 
     if (username === SUPER_ADMIN_CREDENTIALS.username && password === SUPER_ADMIN_CREDENTIALS.password) {
       setIsAdminLoggedIn(true);
