@@ -38,11 +38,17 @@ export const useCloudinaryUpload = () => {
   const uploadImage = async (file) => {
     if (!file) return null;
 
-    const cloudName = process.env.REACT_APP_CLOUDINARY_CLOUD_NAME;
-    const uploadPreset = process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET;
+    // Allow a safe fallback for public client-side uploads when env vars
+    // are not available at build time (useful when the Vercel project
+    // doesn't have env vars set). These values are non-secret (unsigned
+    // preset) and are safe to include as a runtime fallback.
+    const cloudName = process.env.REACT_APP_CLOUDINARY_CLOUD_NAME || 'dseje3kxc';
+    const uploadPreset = process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET || 'fiesta_finder';
 
     if (!cloudName || !uploadPreset) {
-      setError('Cloudinary config missing. Check .env.local');
+      const msg = 'Cloudinary config missing. Check .env.local or Vercel env vars';
+      console.warn(msg, { cloudName, uploadPreset });
+      setError(msg);
       return null;
     }
 
