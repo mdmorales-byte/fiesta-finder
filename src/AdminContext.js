@@ -68,7 +68,8 @@ export const AdminProvider = ({ children }) => {
       expectedAttendees: parseInt(festivalData.expectedAttendees) || 0,
       imageUrls: Array.isArray(festivalData.imagePreviews) && festivalData.imagePreviews.length > 0
         ? [...festivalData.imagePreviews]
-        : (festivalData.imagePreview ? [festivalData.imagePreview] : [])
+        : (festivalData.imagePreview ? [festivalData.imagePreview] : []),
+      joinedUsers: []
     };
 
     setFestivals(prev => [...prev, newFestival]);
@@ -102,6 +103,44 @@ export const AdminProvider = ({ children }) => {
     return festivals.find(festival => festival.id === id);
   };
 
+  const joinFestival = (festivalId) => {
+    setFestivals(prev =>
+      prev.map(festival =>
+        festival.id === festivalId
+          ? {
+              ...festival,
+              joinedUsers: [
+                ...(festival.joinedUsers || []),
+                {
+                  id: 'user-' + Date.now(),
+                  joinedAt: new Date().toISOString(),
+                  rating: null
+                }
+              ]
+            }
+          : festival
+      )
+    );
+  };
+
+  const addUserRating = (festivalId, userId, ratingValue) => {
+    setFestivals(prev =>
+      prev.map(festival =>
+        festival.id === festivalId
+          ? {
+              ...festival,
+              joinedUsers: festival.joinedUsers.map(user =>
+                user.id === userId ? { ...user, rating: ratingValue } : user
+              ),
+              rating: festival.joinedUsers.length > 0
+                ? (festival.joinedUsers.reduce((sum, u) => sum + (u.rating || 0), 0) + ratingValue) / festival.joinedUsers.length
+                : ratingValue
+            }
+          : festival
+      )
+    );
+  };
+
   // Helper function to generate festival ID from name
   const generateFestivalId = (name) => {
     return name
@@ -125,6 +164,8 @@ export const AdminProvider = ({ children }) => {
     updateFestival,
     deleteFestival,
     getFestivalById,
+    joinFestival,
+    addUserRating,
 
     // Note: credentials are read from env vars; do not expose secrets here
   };

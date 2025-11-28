@@ -28,9 +28,13 @@ const categoryIcons = {
 const FestivalDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { getFestivalById, festivals } = useAdmin();
+  const { getFestivalById, festivals, joinFestival, addUserRating } = useAdmin();
   const festival = getFestivalById(id);
   const [lightboxIndex, setLightboxIndex] = React.useState(null);
+  const [userJoined, setUserJoined] = React.useState(false);
+  const [currentUserId, setCurrentUserId] = React.useState(null);
+  const [showRatingForm, setShowRatingForm] = React.useState(false);
+  const [ratingValue, setRatingValue] = React.useState(0);
 
   React.useEffect(() => {
     if (lightboxIndex === null) return;
@@ -101,8 +105,8 @@ const FestivalDetailPage = () => {
               
               <div className="bg-white p-6 rounded-xl shadow-sm hover-lift hover-glow">
                 <Users className="w-8 h-8 text-blue-500 mb-3" />
-                <h3 className="font-semibold text-gray-900 mb-1">Expected Attendees</h3>
-                <p className="text-gray-600">{festival.expectedAttendees?.toLocaleString() || 'TBA'}</p>
+                <h3 className="font-semibold text-gray-900 mb-1">Join Attendees</h3>
+                <p className="text-gray-600">{(festival.joinedUsers?.length || 0).toLocaleString()}</p>
               </div>
               
               <div className="bg-white p-6 rounded-xl shadow-sm hover-lift hover-glow">
@@ -288,9 +292,24 @@ const FestivalDetailPage = () => {
 
             {/* Action Buttons */}
             <div className="space-y-3 animate-slide-up">
-              <button className="w-full bg-gradient-to-r from-pink-500 to-orange-500 text-white py-4 px-6 rounded-lg hover:from-pink-600 hover:to-orange-600 transition-all hover-scale font-semibold text-lg">
-                Join Festival!
-              </button>
+              {!userJoined ? (
+                <button
+                  onClick={() => {
+                    const userId = 'user-' + Date.now();
+                    setCurrentUserId(userId);
+                    joinFestival(id);
+                    setUserJoined(true);
+                    setShowRatingForm(true);
+                  }}
+                  className="w-full bg-gradient-to-r from-pink-500 to-orange-500 text-white py-4 px-6 rounded-lg hover:from-pink-600 hover:to-orange-600 transition-all hover-scale font-semibold text-lg"
+                >
+                  Join Festival!
+                </button>
+              ) : (
+                <button disabled className="w-full bg-gray-400 text-white py-4 px-6 rounded-lg cursor-not-allowed font-semibold text-lg">
+                  ✓ You Joined
+                </button>
+              )}
               <button className="w-full border border-gray-300 text-gray-700 py-3 px-6 rounded-lg hover:bg-gray-50 transition-all hover-scale flex items-center justify-center">
                 <Heart className="w-4 h-4 mr-2" />
                 Add to Favorites
@@ -299,6 +318,48 @@ const FestivalDetailPage = () => {
                 <Share2 className="w-4 h-4 mr-2" />
                 Share Festival
               </button>
+
+              {/* Rating Form */}
+              {showRatingForm && userJoined && (
+                <div className="bg-yellow-50 p-6 rounded-lg border border-yellow-200 space-y-4 mt-6">
+                  <h4 className="font-semibold text-gray-900">Rate This Festival</h4>
+                  <div className="flex gap-2">
+                    {[1, 2, 3, 4, 5].map(star => (
+                      <button
+                        key={star}
+                        onClick={() => setRatingValue(star)}
+                        className={`text-3xl transition-transform hover:scale-110 ${
+                          star <= ratingValue ? 'text-yellow-400' : 'text-gray-300'
+                        }`}
+                      >
+                        ★
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        if (ratingValue > 0) {
+                          addUserRating(id, currentUserId, ratingValue);
+                          setShowRatingForm(false);
+                          alert('Thank you for rating!');
+                        } else {
+                          alert('Please select a rating');
+                        }
+                      }}
+                      className="flex-1 bg-yellow-500 text-white py-2 rounded hover:bg-yellow-600 transition-all font-medium"
+                    >
+                      Submit Rating
+                    </button>
+                    <button
+                      onClick={() => setShowRatingForm(false)}
+                      className="flex-1 border border-gray-300 text-gray-700 py-2 rounded hover:bg-gray-50 transition-all"
+                    >
+                      Skip
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Related Festivals */}
