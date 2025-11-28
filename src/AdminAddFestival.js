@@ -85,9 +85,21 @@ const AdminAddFestival = () => {
       // Upload new images if selected
       if (selectedImages.length > 0) {
         console.log('Starting upload of', selectedImages.length, 'images');
+        console.log('Selected images:', selectedImages.map(f => ({ name: f.name, size: f.size, type: f.type })));
         const uploadedUrls = await uploadMultiple(selectedImages);
-        console.log('Uploaded URLs:', uploadedUrls);
+        console.log('Uploaded URLs returned:', uploadedUrls);
+        
+        if (!uploadedUrls || uploadedUrls.length === 0) {
+          console.error('No URLs returned from upload. Check Cloudinary upload hook error state:', uploadError);
+          if (uploadError) {
+            alert('Upload failed: ' + uploadError);
+            setLoading(false);
+            return;
+          }
+        }
+        
         imageUrls = [...imageUrls, ...uploadedUrls.filter(url => url !== null)];
+        console.log('Final image URLs to save:', imageUrls);
         setSelectedImages([]);
       }
 
@@ -97,12 +109,15 @@ const AdminAddFestival = () => {
         return;
       }
 
+      console.log('Creating festival with', imageUrls.length, 'images');
+
       // Simulate processing time
       await new Promise(resolve => setTimeout(resolve, 1500));
 
       // Add festival using admin context
       const newFestival = addFestival({ ...formData, imagePreviews: imageUrls });
-      console.log('Added festival:', newFestival);
+      console.log('Added festival to context:', newFestival);
+      console.log('Festival imageUrls:', newFestival.imageUrls);
 
       setSubmitted(true);
       setLoading(false);
