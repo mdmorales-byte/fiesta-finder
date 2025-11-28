@@ -2,11 +2,38 @@ import { useState } from 'react';
 
 /**
  * Custom hook for uploading images to Cloudinary
- * Requires env vars: REACT_APP_CLOUDINARY_CLOUD_NAME, REACT_APP_CLOUDINARY_UPLOAD_PRESET
+ * Supports both unsigned (simple) and signed (secure) upload modes.
+ * 
+ * For unsigned: requires REACT_APP_CLOUDINARY_CLOUD_NAME and REACT_APP_CLOUDINARY_UPLOAD_PRESET in .env
+ * For signed: requires a backend endpoint at /api/cloudinary/signature that returns { signature, timestamp, api_key, cloud_name, upload_preset }
  */
 export const useCloudinaryUpload = () => {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
+
+  const getUploadSignature = async () => {
+    try {
+      // Request signature from backend (signed upload mode)
+      const timestamp = Math.floor(Date.now() / 1000);
+      const response = await fetch('/api/cloudinary/signature', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ timestamp })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to get signature: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('Got upload signature from backend:', { timestamp: data.timestamp, signature: data.signature.slice(0, 10) + '...' });
+      return data;
+    } catch (err) {
+      console.error('Error fetching upload signature:', err);
+      setError('Failed to get upload signature from backend: ' + err.message);
+      return null;
+    }
+  };
 
   const uploadImage = async (file) => {
     if (!file) return null;
@@ -19,14 +46,34 @@ export const useCloudinaryUpload = () => {
       return null;
     }
 
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', uploadPreset);
-
     setUploading(true);
     setError(null);
 
     try {
+      console.log('Uploading to Cloudinary', { cloudName, uploadPreset, fileName: file.name });
+      
+      // Try signed upload first (backend signature)
+      let signatureData = null;
+      try {
+        signatureData = await getUploadSignature();
+      } catch (err) {
+        console.warn('Signed upload not available, falling back to unsigned:', err.message);
+      }
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', uploadPreset);
+
+      // If signed upload available, add signature and timestamp
+      if (signatureData) {
+        formData.append('signature', signatureData.signature);
+        formData.append('timestamp', signatureData.timestamp);
+        formData.append('api_key', signatureData.api_key);
+        console.log('Using signed upload');
+      } else {
+        console.log('Using unsigned upload');
+      }
+
       const response = await fetch(
         `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
         {
@@ -35,15 +82,28 @@ export const useCloudinaryUpload = () => {
         }
       );
 
-      if (!response.ok) {
-        throw new Error(`Upload failed: ${response.statusText}`);
+      const text = await response.text();
+      let data = null;
+      try {
+        data = JSON.parse(text);
+      } catch (parseErr) {
+        // not JSON
       }
 
-      const data = await response.json();
+      if (!response.ok) {
+        const errMsg = `Upload failed: ${response.status} ${response.statusText}`;
+        console.error(errMsg, { status: response.status, body: data || text });
+        setError(data?.error?.message || errMsg || text);
+        setUploading(false);
+        return null;
+      }
+
       setUploading(false);
+      console.log('Cloudinary upload success', data);
       return data.secure_url; // Return the secure HTTPS URL
     } catch (err) {
-      setError(err.message);
+      console.error('Cloudinary upload error', err);
+      setError(err.message || String(err));
       setUploading(false);
       return null;
     }
@@ -60,3 +120,4 @@ export const useCloudinaryUpload = () => {
 
   return { uploadImage, uploadMultiple, uploading, error };
 };
+

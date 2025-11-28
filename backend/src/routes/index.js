@@ -3,6 +3,7 @@ const auth = require('../middleware/auth');
 const authController = require('../controllers/authController');
 const festivalController = require('../controllers/festivalController');
 const favoriteController = require('../controllers/favoriteController');
+const cloudinaryController = require('../controllers/cloudinaryController');
 
 const router = express.Router();
 
@@ -18,6 +19,9 @@ router.get('/debug/db', async (_req, res) => {
 router.post('/auth/register', authController.register);
 router.post('/auth/login', authController.login);
 router.get('/auth/me', auth, authController.me);
+
+// Cloudinary
+router.post('/cloudinary/signature', cloudinaryController.getUploadSignature);
 
 // Festivals
 router.get('/festivals', festivalController.list);
