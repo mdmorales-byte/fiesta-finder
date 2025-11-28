@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAdmin } from './AdminContext';
+import { useCloudinaryUpload } from './hooks/useCloudinaryUpload';
 import {
   ArrowLeft,
   Upload,
@@ -13,13 +14,15 @@ import {
   CheckCircle,
   Shield,
   X,
-  AlertCircle
+  AlertCircle,
+  Loader
 } from 'lucide-react';
 
 const AdminEditFestival = () => {
   const { id } = useParams();
   const { getFestivalById, updateFestival, isAdminLoggedIn } = useAdmin();
   const navigate = useNavigate();
+  const { uploadMultiple, uploading: uploadingImages, error: uploadError } = useCloudinaryUpload();
 
   const [formData, setFormData] = useState({
     name: '',
@@ -28,9 +31,9 @@ const AdminEditFestival = () => {
     description: '',
     category: '',
     expectedAttendees: '',
-    images: [],
     imagePreviews: []
   });
+  const [selectedImages, setSelectedImages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [updated, setUpdated] = useState(false);
   const [festivalNotFound, setFestivalNotFound] = useState(false);
@@ -52,7 +55,6 @@ const AdminEditFestival = () => {
         description: festival.description || '',
         category: festival.category || '',
         expectedAttendees: festival.expectedAttendees?.toString() || '',
-        images: [],
         imagePreviews: festival.imageUrls || []
       });
     } else {
@@ -76,19 +78,7 @@ const AdminEditFestival = () => {
     const { name, value, files } = e.target;
 
     if (name === 'image' && files && files.length) {
-      const selectedFiles = Array.from(files);
-      const readers = selectedFiles.map(file => new Promise(resolve => {
-        const reader = new FileReader();
-        reader.onload = (e2) => resolve({ file, dataUrl: e2.target.result });
-        reader.readAsDataURL(file);
-      }));
-      Promise.all(readers).then(results => {
-        setFormData(prev => ({
-          ...prev,
-          images: [...prev.images, ...results.map(r => r.file)],
-          imagePreviews: [...prev.imagePreviews, ...results.map(r => r.dataUrl)]
-        }));
-      });
+      setSelectedImages(Array.from(files));
     } else {
       setFormData(prev => ({
         ...prev,
@@ -99,11 +89,9 @@ const AdminEditFestival = () => {
 
   const removeImage = (index) => {
     setFormData(prev => {
-      const newImages = [...prev.images];
       const newPreviews = [...prev.imagePreviews];
-      newImages.splice(index, 1);
       newPreviews.splice(index, 1);
-      return { ...prev, images: newImages, imagePreviews: newPreviews };
+      return { ...prev, imagePreviews: newPreviews };
     });
   };
 
@@ -112,11 +100,20 @@ const AdminEditFestival = () => {
     setLoading(true);
 
     try {
+      let imageUrls = [...formData.imagePreviews];
+
+      // Upload new images if selected
+      if (selectedImages.length > 0) {
+        const uploadedUrls = await uploadMultiple(selectedImages);
+        imageUrls = [...imageUrls, ...uploadedUrls];
+        setSelectedImages([]);
+      }
+
       // Simulate processing time
       await new Promise(resolve => setTimeout(resolve, 1500));
 
       // Update festival using admin context
-      const updateData = { ...formData };
+      const updateData = { ...formData, imagePreviews: imageUrls };
       if (updateData.expectedAttendees) {
         updateData.expectedAttendees = parseInt(updateData.expectedAttendees);
       }
@@ -357,6 +354,21 @@ const AdminEditFestival = () => {
                 Festival Image
               </h2>
 
+              {uploadError && (
+                <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm">
+                  Upload error: {uploadError}
+                </div>
+              )}
+
+              {selectedImages.length > 0 && (
+                <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center text-blue-700 text-sm">
+                    <Loader className="h-4 w-4 mr-2 animate-spin" />
+                    {uploadingImages ? `Uploading ${selectedImages.length} image(s)...` : `Ready to upload ${selectedImages.length} image(s)`}
+                  </div>
+                </div>
+              )}
+
               {formData.imagePreviews && formData.imagePreviews.length > 0 ? (
                 <div className="relative">
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -386,6 +398,7 @@ const AdminEditFestival = () => {
                       onChange={handleInputChange}
                       accept="image/*"
                       multiple
+                      disabled={uploadingImages}
                       className="sr-only"
                     />
                   </label>

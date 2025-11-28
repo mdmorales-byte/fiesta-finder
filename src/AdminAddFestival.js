@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAdmin } from './AdminContext';
+import { useCloudinaryUpload } from './hooks/useCloudinaryUpload';
 import {
   ArrowLeft,
   Upload,
@@ -12,10 +13,13 @@ import {
   Tag,
   CheckCircle,
   Shield,
-  X
+  X,
+  Loader
 } from 'lucide-react';
 
 const AdminAddFestival = () => {
+  const { uploadMultiple, uploading: uploadingImages, error: uploadError } = useCloudinaryUpload();
+
   const [formData, setFormData] = useState({
     name: '',
     location: '',
@@ -23,9 +27,9 @@ const AdminAddFestival = () => {
     description: '',
     category: '',
     expectedAttendees: '',
-    images: [],
     imagePreviews: []
   });
+  const [selectedImages, setSelectedImages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
@@ -54,19 +58,7 @@ const AdminAddFestival = () => {
     const { name, value, files } = e.target;
 
     if (name === 'image' && files && files.length) {
-      const selectedFiles = Array.from(files);
-      const readers = selectedFiles.map(file => new Promise(resolve => {
-        const reader = new FileReader();
-        reader.onload = (e2) => resolve({ file, dataUrl: e2.target.result });
-        reader.readAsDataURL(file);
-      }));
-      Promise.all(readers).then(results => {
-        setFormData(prev => ({
-          ...prev,
-          images: [...prev.images, ...results.map(r => r.file)],
-          imagePreviews: [...prev.imagePreviews, ...results.map(r => r.dataUrl)]
-        }));
-      });
+      setSelectedImages(Array.from(files));
     } else {
       setFormData(prev => ({
         ...prev,
@@ -77,11 +69,9 @@ const AdminAddFestival = () => {
 
   const removeImage = (index) => {
     setFormData(prev => {
-      const newImages = [...prev.images];
       const newPreviews = [...prev.imagePreviews];
-      newImages.splice(index, 1);
       newPreviews.splice(index, 1);
-      return { ...prev, images: newImages, imagePreviews: newPreviews };
+      return { ...prev, imagePreviews: newPreviews };
     });
   };
 
@@ -90,11 +80,20 @@ const AdminAddFestival = () => {
     setLoading(true);
 
     try {
+      let imageUrls = [...formData.imagePreviews];
+
+      // Upload new images if selected
+      if (selectedImages.length > 0) {
+        const uploadedUrls = await uploadMultiple(selectedImages);
+        imageUrls = [...imageUrls, ...uploadedUrls];
+        setSelectedImages([]);
+      }
+
       // Simulate processing time
       await new Promise(resolve => setTimeout(resolve, 1500));
 
       // Add festival using admin context
-      const newFestival = addFestival(formData);
+      const newFestival = addFestival({ ...formData, imagePreviews: imageUrls });
       console.log('Added festival:', newFestival);
 
       setSubmitted(true);
@@ -316,7 +315,22 @@ const AdminAddFestival = () => {
                 Festival Image
               </h2>
 
-              {formData.imagePreview ? (
+              {uploadError && (
+                <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm">
+                  Upload error: {uploadError}
+                </div>
+              )}
+
+              {selectedImages.length > 0 && (
+                <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center text-blue-700 text-sm">
+                    <Loader className="h-4 w-4 mr-2 animate-spin" />
+                    {uploadingImages ? `Uploading ${selectedImages.length} image(s)...` : `Ready to upload ${selectedImages.length} image(s)`}
+                  </div>
+                </div>
+              )}
+
+              {formData.imagePreviews && formData.imagePreviews.length > 0 ? (
                 <div className="relative">
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     {formData.imagePreviews.map((src, idx) => (
@@ -337,7 +351,7 @@ const AdminAddFestival = () => {
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-red-500 transition-colors">
                   <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                   <label className="cursor-pointer">
-                    <span className="text-red-600 hover:text-red-700 font-medium">Upload an image</span>
+                    <span className="text-red-600 hover:text-red-700 font-medium">Upload images</span>
                     <span className="text-gray-500"> or drag and drop</span>
                     <input
                       type="file"
@@ -345,6 +359,7 @@ const AdminAddFestival = () => {
                       onChange={handleInputChange}
                       accept="image/*"
                       multiple
+                      disabled={uploadingImages}
                       className="sr-only"
                     />
                   </label>
