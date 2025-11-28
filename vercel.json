@@ -1,12 +1,12 @@
 {
 	"version": 2,
 	"builds": [
-		{ "src": "fiesta-finder/package.json", "use": "@vercel/static-build", "config": { "distDir": "build", "installCommand": "npm ci", "buildCommand": "npm run build" } }
+		{ "src": "package.json", "use": "@vercel/static-build", "config": { "distDir": "build", "installCommand": "npm ci", "buildCommand": "npm run build" } }
 	],
 	"routes": [
 		{ "handle": "filesystem" },
-		{ "src": "/(.*)", "dest": "fiesta-finder/build/$1" },
-		{ "src": "/.*", "dest": "fiesta-finder/build/index.html" }
+		{ "src": "/(.*)", "dest": "build/$1" },
+		{ "src": "/.*", "dest": "build/index.html" }
 	]
 }
 
