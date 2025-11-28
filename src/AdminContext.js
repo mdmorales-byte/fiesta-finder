@@ -73,6 +73,7 @@ export const AdminProvider = ({ children }) => {
 
     setFestivals(prev => [...prev, newFestival]);
     return newFestival;
+    console.log('[AdminContext.addFestival] Festival created:', { name: newFestival.name, imageUrlsCount: newFestival.imageUrls.length });
   };
 
   const updateFestival = (festivalId, updatedData) => {
