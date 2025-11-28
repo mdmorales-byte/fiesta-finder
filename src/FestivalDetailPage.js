@@ -1,6 +1,7 @@
 import React from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAdmin } from './AdminContext';
+import { AuthContext } from './App';
 import {
   ArrowLeft,
   MapPin,
@@ -29,12 +30,21 @@ const FestivalDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { getFestivalById, festivals, joinFestival, addUserRating } = useAdmin();
+  const { user } = React.useContext(AuthContext);
   const festival = getFestivalById(id);
   const [lightboxIndex, setLightboxIndex] = React.useState(null);
   const [userJoined, setUserJoined] = React.useState(false);
   const [currentUserId, setCurrentUserId] = React.useState(null);
   const [showRatingForm, setShowRatingForm] = React.useState(false);
   const [ratingValue, setRatingValue] = React.useState(0);
+
+  // Check if current user already joined
+  React.useEffect(() => {
+    if (festival && user && festival.joinedUsers) {
+      const hasJoined = festival.joinedUsers.some(joined => joined.id === user.email);
+      setUserJoined(hasJoined);
+    }
+  }, [festival, user]);
 
   React.useEffect(() => {
     if (lightboxIndex === null) return;
@@ -295,10 +305,14 @@ const FestivalDetailPage = () => {
               {!userJoined ? (
                 <button
                   onClick={() => {
-                    const userId = 'user-' + Date.now();
-                    setCurrentUserId(userId);
-                    joinFestival(id);
+                    if (!user) {
+                      alert('Please log in or sign up to join festivals!');
+                      navigate('/signin');
+                      return;
+                    }
+                    joinFestival(id, user.email);
                     setUserJoined(true);
+                    setCurrentUserId(user.email);
                     setShowRatingForm(true);
                   }}
                   className="w-full bg-gradient-to-r from-pink-500 to-orange-500 text-white py-4 px-6 rounded-lg hover:from-pink-600 hover:to-orange-600 transition-all hover-scale font-semibold text-lg"

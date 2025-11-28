@@ -103,7 +103,7 @@ export const AdminProvider = ({ children }) => {
     return festivals.find(festival => festival.id === id);
   };
 
-  const joinFestival = (festivalId) => {
+  const joinFestival = (festivalId, userId) => {
     setFestivals(prev =>
       prev.map(festival =>
         festival.id === festivalId
@@ -112,7 +112,7 @@ export const AdminProvider = ({ children }) => {
               joinedUsers: [
                 ...(festival.joinedUsers || []),
                 {
-                  id: 'user-' + Date.now(),
+                  id: userId,
                   joinedAt: new Date().toISOString(),
                   rating: null
                 }
