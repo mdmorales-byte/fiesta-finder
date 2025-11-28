@@ -126,8 +126,7 @@ export const AdminProvider = ({ children }) => {
     deleteFestival,
     getFestivalById,
 
-    // Credentials for display (remove in production)
-    SUPER_ADMIN_CREDENTIALS
+    // Note: credentials are read from env vars; do not expose secrets here
   };
 
   return (
