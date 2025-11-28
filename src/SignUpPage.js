@@ -1,13 +1,12 @@
 import React, { useContext, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from './App';
-import { Mail, Lock, User, LogIn } from 'lucide-react';
+import { Mail, Lock, LogIn } from 'lucide-react';
 
 const SignUpPage = () => {
   const navigate = useNavigate();
   const { setUser } = useContext(AuthContext);
 
-  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -22,7 +21,7 @@ const SignUpPage = () => {
       return;
     }
 
-    const newUser = { name: fullName || 'New User', email, avatar: '🎭' };
+    const newUser = { name: email.split('@')[0] || 'User', email, avatar: '🎭' };
     setUser(newUser);
     localStorage.setItem('user', JSON.stringify(newUser));
     navigate('/');
@@ -40,22 +39,6 @@ const SignUpPage = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm p-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <User className="h-5 w-5 text-gray-400" />
-              </div>
-              <input
-                type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="Enter your full name"
-                className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
-              />
-            </div>
-          </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
             <div className="relative">
