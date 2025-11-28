@@ -34,7 +34,17 @@ export const AdminProvider = ({ children }) => {
 
   // Save festivals to localStorage whenever they change
   useEffect(() => {
-    localStorage.setItem('festivals', JSON.stringify(festivals));
+    try {
+      localStorage.setItem('festivals', JSON.stringify(festivals));
+      // Safe logging for debugging on Vercel — festivals is always an array here
+      console.log('[AdminContext] Festivals saved to localStorage:', Array.isArray(festivals) ? festivals.length : 0);
+      if (Array.isArray(festivals) && festivals.length > 0) {
+        const latest = festivals[festivals.length - 1];
+        console.log('[AdminContext] Latest festival saved:', { id: latest.id, name: latest.name, imageUrlsCount: Array.isArray(latest.imageUrls) ? latest.imageUrls.length : 0 });
+      }
+    } catch (err) {
+      console.error('[AdminContext] Error saving festivals to localStorage:', err);
+    }
   }, [festivals]);
 
   const adminLogin = async (username, password) => {
