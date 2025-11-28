@@ -84,9 +84,17 @@ const AdminAddFestival = () => {
 
       // Upload new images if selected
       if (selectedImages.length > 0) {
+        console.log('Starting upload of', selectedImages.length, 'images');
         const uploadedUrls = await uploadMultiple(selectedImages);
-        imageUrls = [...imageUrls, ...uploadedUrls];
+        console.log('Uploaded URLs:', uploadedUrls);
+        imageUrls = [...imageUrls, ...uploadedUrls.filter(url => url !== null)];
         setSelectedImages([]);
+      }
+
+      if (imageUrls.length === 0) {
+        alert('Please add at least one image');
+        setLoading(false);
+        return;
       }
 
       // Simulate processing time
@@ -100,6 +108,7 @@ const AdminAddFestival = () => {
       setLoading(false);
     } catch (error) {
       console.error('Error adding festival:', error);
+      alert('Error: ' + error.message);
       setLoading(false);
     }
   };
@@ -359,7 +368,7 @@ const AdminAddFestival = () => {
                       onChange={handleInputChange}
                       accept="image/*"
                       multiple
-                      disabled={uploadingImages}
+                      disabled={uploadingImages || loading}
                       className="sr-only"
                     />
                   </label>
@@ -373,19 +382,25 @@ const AdminAddFestival = () => {
               <button
                 type="button"
                 onClick={() => navigate('/admin/dashboard')}
-                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all"
+                disabled={loading || uploadingImages}
+                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                disabled={loading}
-                className="px-8 py-3 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-lg hover:from-red-600 hover:to-orange-600 transition-all font-medium flex items-center"
+                disabled={loading || uploadingImages || selectedImages.length === 0}
+                className="px-8 py-3 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-lg hover:from-red-600 hover:to-orange-600 transition-all font-medium flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                     Adding Festival...
+                  </>
+                ) : uploadingImages ? (
+                  <>
+                    <Loader className="h-5 w-5 mr-2 animate-spin" />
+                    Uploading Images...
                   </>
                 ) : (
                   <>
