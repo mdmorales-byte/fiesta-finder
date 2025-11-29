@@ -11,26 +11,42 @@ export const useCloudinaryUpload = () => {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Generic timeout wrapper for fetch
+  const fetchWithTimeout = async (resource, options = {}, timeoutMs = 15000) => {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(resource, { ...options, signal: controller.signal });
+      return response;
+    } finally {
+      clearTimeout(id);
+    }
+  };
+
   const getUploadSignature = async () => {
     try {
       // Request signature from backend (signed upload mode)
       const timestamp = Math.floor(Date.now() / 1000);
-      const response = await fetch('/api/cloudinary/signature', {
+      const response = await fetchWithTimeout('/api/cloudinary/signature', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ timestamp })
-      });
+      }, 2500); // fail fast; we'll fall back to unsigned upload
 
       if (!response.ok) {
         throw new Error(`Failed to get signature: ${response.statusText}`);
       }
 
       const data = await response.json();
-      console.log('Got upload signature from backend:', { timestamp: data.timestamp, signature: data.signature.slice(0, 10) + '...' });
+      if (data?.signature) {
+        console.log('Got upload signature from backend:', { timestamp: data.timestamp, signature: data.signature.slice(0, 10) + '...' });
+      } else {
+        throw new Error('Signature payload missing required fields');
+      }
       return data;
     } catch (err) {
       console.error('Error fetching upload signature:', err);
-      setError('Failed to get upload signature from backend: ' + err.message);
+      // Do not set a blocking error here; we'll fall back to unsigned mode.
       return null;
     }
   };
@@ -38,16 +54,27 @@ export const useCloudinaryUpload = () => {
   const uploadImage = async (file) => {
     if (!file) return null;
 
+    // Flip uploading early so UI can react even if we fail fast
+    setUploading(true);
+    setError(null);
+
     const cloudName = process.env.REACT_APP_CLOUDINARY_CLOUD_NAME;
     const uploadPreset = process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET;
 
     if (!cloudName || !uploadPreset) {
       setError('Cloudinary config missing. Check .env.local');
+      setUploading(false);
       return null;
     }
 
-    setUploading(true);
-    setError(null);
+    // Enforce 10MB limit (align with UI copy)
+    const maxBytes = 10 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      setError('Image too large. Max size is 10MB.');
+      setUploading(false);
+      return null;
+    }
+
 
     try {
       console.log('Uploading to Cloudinary', { cloudName, uploadPreset, fileName: file.name });
@@ -74,12 +101,13 @@ export const useCloudinaryUpload = () => {
         console.log('Using unsigned upload');
       }
 
-      const response = await fetch(
+      const response = await fetchWithTimeout(
         `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
         {
           method: 'POST',
           body: formData
-        }
+        },
+        30000 // 30s timeout
       );
 
       const text = await response.text();
@@ -103,7 +131,11 @@ export const useCloudinaryUpload = () => {
       return data.secure_url; // Return the secure HTTPS URL
     } catch (err) {
       console.error('Cloudinary upload error', err);
-      setError(err.message || String(err));
+      if (err?.name === 'AbortError') {
+        setError('Upload timed out. Please check your internet connection and try again.');
+      } else {
+        setError(err.message || String(err));
+      }
       setUploading(false);
       return null;
     }

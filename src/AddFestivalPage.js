@@ -1,6 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from './App';
+import { useAdmin } from './AdminContext';
 import { 
   ArrowLeft, 
   Upload, 
@@ -10,8 +11,11 @@ import {
   Type,
   FileText,
   Tag,
-  CheckCircle
+  CheckCircle,
+  Loader,
+  X
 } from 'lucide-react';
+import { useCloudinaryUpload } from './hooks/useCloudinaryUpload';
 
 const AddFestivalPage = () => {
   const [formData, setFormData] = useState({
@@ -24,12 +28,17 @@ const AddFestivalPage = () => {
     contactEmail: '',
     organizerName: '',
     website: '',
-    image: null
+    imagePreviews: [],
+    imageUrls: []
   });
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [selecting, setSelecting] = useState(false);
+  const [selectedImages, setSelectedImages] = useState([]);
+  const { uploadImage, uploading, error: uploadError } = useCloudinaryUpload();
   
   const { user } = useContext(AuthContext);
+  const { submitFestivalForApproval } = useAdmin();
   const navigate = useNavigate();
 
   const months = [
@@ -46,21 +55,113 @@ const AddFestivalPage = () => {
 
   const handleInputChange = (e) => {
     const { name, value, files } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: files ? files[0] : value
-    }));
+    if (name === 'image' && files && files.length) {
+      const fileArr = Array.from(files);
+      setSelecting(true);
+      const localPreviews = fileArr.map(f => URL.createObjectURL(f));
+      setSelectedImages(fileArr);
+      setFormData(prev => ({
+        ...prev,
+        imagePreviews: [...(prev.imagePreviews || []), ...localPreviews]
+      }));
+      setSelecting(false);
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
+  };
+
+  const removeImage = (index) => {
+    setFormData(prev => {
+      const newPreviews = [...prev.imagePreviews];
+      newPreviews.splice(index, 1);
+      return { ...prev, imagePreviews: newPreviews };
+    });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-
-    // Simulate API submission
-    setTimeout(() => {
-      setSubmitted(true);
+    
+    try {
+      // 1. Upload all selected images first
+      let uploadedImageUrls = [];
+      
+      if (selectedImages.length > 0) {
+        // Upload images one by one
+        for (const file of selectedImages) {
+          try {
+            const url = await uploadImage(file);
+            if (url) {
+              uploadedImageUrls.push(url);
+            }
+          } catch (error) {
+            console.error('Error uploading image:', error);
+            // Continue with other images even if one fails
+          }
+        }
+        
+        // If no images were uploaded successfully and there are no previous URLs
+        if (uploadedImageUrls.length === 0 && formData.imageUrls.length === 0) {
+          alert('Failed to upload images. Please try again.');
+          setLoading(false);
+          return;
+        }
+        
+        // Clear selected images after upload
+        setSelectedImages([]);
+      }
+      
+      // Combine with any existing image URLs
+      const allImageUrls = [...formData.imageUrls, ...uploadedImageUrls];
+      
+      // 2. Prepare the festival submission
+      const submission = {
+        name: formData.name.trim(),
+        location: formData.location.trim(),
+        month: formData.month,
+        description: formData.description.trim(),
+        category: formData.category,
+        expectedAttendees: formData.expectedAttendees || '0',
+        contactEmail: formData.contactEmail?.trim() || '',
+        organizerName: formData.organizerName?.trim() || '',
+        website: formData.website?.trim() || '',
+        imagePreviews: allImageUrls,
+        imageUrls: allImageUrls,
+        submittedBy: user?.email || 'anonymous',
+        submittedAt: new Date().toISOString()
+      };
+      
+      console.log('[AddFestivalPage] Submitting for approval:', submission);
+      
+      try {
+        const result = submitFestivalForApproval(submission);
+        console.log('submitFestivalForApproval result:', result);
+        
+        // Verify the submission was added to localStorage
+        const storedSubmissions = JSON.parse(localStorage.getItem('pendingSubmissions') || '[]');
+        console.log('Current pending submissions in localStorage:', storedSubmissions);
+        
+        // Update form data with the new image URLs
+        setFormData(prev => ({
+          ...prev,
+          imageUrls: allImageUrls,
+          imagePreviews: allImageUrls
+        }));
+        
+        setSubmitted(true);
+        alert('Festival submitted for approval successfully!');
+      } catch (submitError) {
+        console.error('Error in submitFestivalForApproval:', submitError);
+        throw submitError;
+      }
+    } catch (err) {
+      console.error('Submit failed:', err);
+      alert(err?.message || String(err));
       setLoading(false);
-    }, 2000);
+    }
   };
 
   if (!user) {
@@ -307,21 +408,54 @@ const AddFestivalPage = () => {
                 <Upload className="w-5 h-5 mr-2 text-pink-500" />
                 Festival Image
               </h2>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-pink-500 transition-colors">
-                <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <label className="cursor-pointer">
-                  <span className="text-pink-600 hover:text-pink-700 font-medium">Upload an image</span>
-                  <span className="text-gray-500"> or drag and drop</span>
-                  <input
-                    type="file"
-                    name="image"
-                    onChange={handleInputChange}
-                    accept="image/*"
-                    className="sr-only"
-                  />
-                </label>
-                <p className="text-gray-400 text-sm mt-2">PNG, JPG, GIF up to 10MB</p>
-              </div>
+              {uploadError && (
+                <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm">
+                  Upload error: {uploadError}
+                </div>
+              )}
+              {(uploading || selecting) && (
+                <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center text-blue-700 text-sm">
+                    <Loader className="h-4 w-4 mr-2 animate-spin" />
+                    {`Preparing ${selectedImages.length || ''} image(s)...`}
+                  </div>
+                </div>
+              )}
+              {formData.imagePreviews && formData.imagePreviews.length > 0 ? (
+                <div className="relative">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {formData.imagePreviews.map((src, idx) => (
+                      <div key={idx} className="relative">
+                        <img src={src} alt={`Preview ${idx+1}`} className="w-full h-32 object-cover rounded-lg" />
+                        <button
+                          type="button"
+                          onClick={() => removeImage(idx)}
+                          className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-pink-500 transition-colors">
+                  <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                  <label className="cursor-pointer">
+                    <span className="text-pink-600 hover:text-pink-700 font-medium">Upload an image</span>
+                    <span className="text-gray-500"> or drag and drop</span>
+                    <input
+                      type="file"
+                      name="image"
+                      onChange={handleInputChange}
+                      accept="image/*"
+                      multiple
+                      className="sr-only"
+                    />
+                  </label>
+                  <p className="text-gray-400 text-sm mt-2">PNG, JPG, GIF up to 10MB</p>
+                </div>
+              )}
             </div>
 
             {/* Submit Button */}
@@ -335,7 +469,7 @@ const AddFestivalPage = () => {
               </button>
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || uploading}
                 className="px-8 py-3 bg-gradient-to-r from-pink-500 to-orange-500 text-white rounded-lg hover:from-pink-600 hover:to-orange-600 transition-all hover-scale font-medium flex items-center"
               >
                 {loading ? (
@@ -343,9 +477,12 @@ const AddFestivalPage = () => {
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                     Submitting...
                   </>
-                ) : (
-                  'Submit Festival'
-                )}
+                ) : uploading ? (
+                  <>
+                    <Loader className="h-5 w-5 mr-2 animate-spin" />
+                    Uploading Images...
+                  </>
+                ) : 'Submit Festival'}
               </button>
             </div>
           </form>

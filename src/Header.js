@@ -8,7 +8,7 @@ const Header = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, setUser } = useContext(AuthContext);
-  const { favorites } = useContext(FavoritesContext);
+  const { unreadFavoritesCount } = useContext(FavoritesContext);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -76,9 +76,9 @@ const Header = () => {
             >
               <Heart className="w-4 h-4 mr-2" />
               Favorites
-              {favorites.size > 0 && (
+              {unreadFavoritesCount > 0 && location.pathname !== '/favorites' && (
                 <span className="absolute -top-2 -right-2 bg-pink-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                  {favorites.size}
+                  {unreadFavoritesCount}
                 </span>
               )}
             </Link>

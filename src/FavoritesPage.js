@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import React, { useContext, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { FavoritesContext } from './App';
 import { useAdmin } from './AdminContext';
@@ -6,10 +6,15 @@ import FestivalCard from './FestivalCard';
 import { Heart, ArrowRight } from 'lucide-react';
 
 const FavoritesPage = () => {
-  const { favorites } = useContext(FavoritesContext);
+  const { favorites, markFavoritesSeen } = useContext(FavoritesContext);
   const { festivals } = useAdmin();
 
   const favoriteFestivals = festivals.filter(festival => favorites.has(festival.id));
+
+  // Clear unread favorites badge when the page is viewed
+  useEffect(() => {
+    markFavoritesSeen();
+  }, [markFavoritesSeen]);
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">

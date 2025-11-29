@@ -23,6 +23,7 @@ export const FavoritesContext = createContext();
 function App() {
   const [user, setUser] = useState(null);
   const [favorites, setFavorites] = useState(new Set());
+  const [favoritesLastSeenCount, setFavoritesLastSeenCount] = useState(0);
 
   const handleFavorite = (festivalId) => {
     setFavorites(prev => {
@@ -44,12 +45,25 @@ function App() {
     if (savedFavorites) {
       setFavorites(new Set(JSON.parse(savedFavorites)));
     }
+    const savedLastSeen = localStorage.getItem('favorites_last_seen_count');
+    if (savedLastSeen !== null) {
+      const n = parseInt(savedLastSeen, 10);
+      if (!Number.isNaN(n)) setFavoritesLastSeenCount(n);
+    }
   }, []);
+
+  const markFavoritesSeen = React.useCallback(() => {
+    const countNow = favorites.size;
+    setFavoritesLastSeenCount(countNow);
+    localStorage.setItem('favorites_last_seen_count', String(countNow));
+  }, [favorites]);
+
+  const unreadFavoritesCount = Math.max(favorites.size - favoritesLastSeenCount, 0);
 
   return (
     <AdminProvider>
       <AuthContext.Provider value={{ user, setUser }}>
-        <FavoritesContext.Provider value={{ favorites, handleFavorite }}>
+        <FavoritesContext.Provider value={{ favorites, handleFavorite, markFavoritesSeen, unreadFavoritesCount }}>
           <Router>
             <div className="min-h-screen bg-white">
               <Header />

@@ -78,7 +78,14 @@ const AdminEditFestival = () => {
     const { name, value, files } = e.target;
 
     if (name === 'image' && files && files.length) {
-      setSelectedImages(Array.from(files));
+      const fileArr = Array.from(files);
+      setSelectedImages(fileArr);
+      // Show immediate local previews
+      const localPreviews = fileArr.map(f => URL.createObjectURL(f));
+      setFormData(prev => ({
+        ...prev,
+        imagePreviews: [...(prev.imagePreviews || []), ...localPreviews]
+      }));
     } else {
       setFormData(prev => ({
         ...prev,
@@ -100,20 +107,31 @@ const AdminEditFestival = () => {
     setLoading(true);
 
     try {
-      let imageUrls = [...formData.imagePreviews];
+      // Start from existing non-blob URLs only
+      const existingUrls = (formData.imagePreviews || []).filter(u => typeof u === 'string' && !u.startsWith('blob:'));
+      let imageUrls = [...existingUrls];
 
       // Upload new images if selected
       if (selectedImages.length > 0) {
-        const uploadedUrls = await uploadMultiple(selectedImages);
-        imageUrls = [...imageUrls, ...uploadedUrls];
+        // Copy and clear early so UI banner doesn't stick
+        const filesToUpload = [...selectedImages];
         setSelectedImages([]);
+        const uploadedUrls = await uploadMultiple(filesToUpload);
+        // If uploads failed (e.g., missing Cloudinary config), stop and surface error
+        if (!uploadedUrls || uploadedUrls.length === 0) {
+          setLoading(false);
+          alert('Image upload failed. Please check your Cloudinary settings and try again.');
+          return;
+        }
+        imageUrls = [...imageUrls, ...uploadedUrls];
       }
 
       // Simulate processing time
       await new Promise(resolve => setTimeout(resolve, 1500));
 
-      // Update festival using admin context
-      const updateData = { ...formData, imagePreviews: imageUrls };
+      // Filter out any temporary blob: previews before saving; preserve order
+      const finalUrls = imageUrls.filter(u => typeof u === 'string' && !u.startsWith('blob:'));
+      const updateData = { ...formData, imagePreviews: finalUrls };
       if (updateData.expectedAttendees) {
         updateData.expectedAttendees = parseInt(updateData.expectedAttendees);
       }
@@ -175,6 +193,15 @@ const AdminEditFestival = () => {
       </div>
     );
   }
+
+  // Decide which previews to show: local form previews or existing stored URLs
+  const displayPreviews = (formData.imagePreviews && formData.imagePreviews.length > 0)
+    ? formData.imagePreviews
+    : ((getFestivalById(id)?.imageUrls) || []);
+  console.log('[AdminEditFestival] displayPreviews count:', displayPreviews.length, {
+    formPreviews: formData.imagePreviews?.length || 0,
+    storedUrls: getFestivalById(id)?.imageUrls?.length || 0
+  });
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
@@ -360,19 +387,19 @@ const AdminEditFestival = () => {
                 </div>
               )}
 
-              {selectedImages.length > 0 && (
+              {uploadingImages && (
                 <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <div className="flex items-center text-blue-700 text-sm">
                     <Loader className="h-4 w-4 mr-2 animate-spin" />
-                    {uploadingImages ? `Uploading ${selectedImages.length} image(s)...` : `Ready to upload ${selectedImages.length} image(s)`}
+                    {`Uploading ${selectedImages.length} image(s)...`}
                   </div>
                 </div>
               )}
 
-              {formData.imagePreviews && formData.imagePreviews.length > 0 ? (
+              {displayPreviews && displayPreviews.length > 0 ? (
                 <div className="relative">
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {formData.imagePreviews.map((src, idx) => (
+                    {displayPreviews.map((src, idx) => (
                       <div key={idx} className="relative">
                         <img src={src} alt={`Festival preview ${idx+1}`} className="w-full h-32 object-cover rounded-lg" />
                         <button
@@ -418,7 +445,7 @@ const AdminEditFestival = () => {
               </button>
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || uploadingImages}
                 className="px-8 py-3 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-lg hover:from-red-600 hover:to-orange-600 transition-all font-medium flex items-center"
               >
                 {loading ? (

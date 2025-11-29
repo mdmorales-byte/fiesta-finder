@@ -30,6 +30,7 @@ const AdminAddFestival = () => {
     imagePreviews: []
   });
   const [selectedImages, setSelectedImages] = useState([]);
+  const [uploadCount, setUploadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
@@ -58,7 +59,14 @@ const AdminAddFestival = () => {
     const { name, value, files } = e.target;
 
     if (name === 'image' && files && files.length) {
-      setSelectedImages(Array.from(files));
+      const fileArr = Array.from(files);
+      setSelectedImages(fileArr);
+      // Create local object URL previews for immediate display
+      const localPreviews = fileArr.map(f => URL.createObjectURL(f));
+      setFormData(prev => ({
+        ...prev,
+        imagePreviews: [...(prev.imagePreviews || []), ...localPreviews]
+      }));
     } else {
       setFormData(prev => ({
         ...prev,
@@ -84,24 +92,44 @@ const AdminAddFestival = () => {
 
       // Upload new images if selected
       if (selectedImages.length > 0) {
+        // Copy selection locally and clear immediately so UI banner does not stick
+        const filesToUpload = [...selectedImages];
+        setUploadCount(filesToUpload.length);
+        setSelectedImages([]);
         console.log('Starting upload of', selectedImages.length, 'images');
         console.log('Selected images:', selectedImages.map(f => ({ name: f.name, size: f.size, type: f.type })));
-        const uploadedUrls = await uploadMultiple(selectedImages);
+        const uploadedUrls = await uploadMultiple(filesToUpload);
         console.log('Uploaded URLs returned:', uploadedUrls);
         
         if (!uploadedUrls || uploadedUrls.length === 0) {
           console.error('No URLs returned from upload. Check Cloudinary upload hook error state:', uploadError);
+          // Surface error and clear selection so the banner doesn't stay stuck
           if (uploadError) {
             alert('Upload failed: ' + uploadError);
-            setLoading(false);
-            return;
+          } else {
+            alert('Upload failed. Please check your Cloudinary settings and try again.');
           }
+          setSelectedImages([]);
+          setUploadCount(0);
+          setLoading(false);
+          return;
         }
-        
+        // If some images failed, stop and ask the user to retry for reliability
+        if (uploadedUrls.length !== filesToUpload.length) {
+          alert(`Only ${uploadedUrls.length} of ${filesToUpload.length} images uploaded successfully. Please try again.`);
+          setUploadCount(0);
+          setLoading(false);
+          return;
+        }
+
         imageUrls = [...imageUrls, ...uploadedUrls.filter(url => url !== null)];
         console.log('Final image URLs to save:', imageUrls);
         setSelectedImages([]);
+        setUploadCount(0);
       }
+
+      // Remove temporary blob previews before saving (preserve order and duplicates intentionally)
+      imageUrls = imageUrls.filter(u => typeof u === 'string' && !u.startsWith('blob:'));
 
       if (imageUrls.length === 0) {
         alert('Please add at least one image');
@@ -345,11 +373,11 @@ const AdminAddFestival = () => {
                 </div>
               )}
 
-              {selectedImages.length > 0 && (
+              {uploadingImages && uploadCount > 0 && (
                 <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <div className="flex items-center text-blue-700 text-sm">
                     <Loader className="h-4 w-4 mr-2 animate-spin" />
-                    {uploadingImages ? `Uploading ${selectedImages.length} image(s)...` : `Ready to upload ${selectedImages.length} image(s)`}
+                    {`Uploading ${uploadCount} image(s)...`}
                   </div>
                 </div>
               )}

@@ -50,12 +50,11 @@ const FestivalDetailPage = () => {
     if (lightboxIndex === null) return;
     const handleKey = (e) => {
       if (e.key === 'Escape') setLightboxIndex(null);
-      if (e.key === 'ArrowRight') setLightboxIndex((prev) => (prev + 1) % festival.imageUrls.length);
-      if (e.key === 'ArrowLeft') setLightboxIndex((prev) => (prev - 1 + festival.imageUrls.length) % festival.imageUrls.length);
+      // Note: We'll compute with current gallery length at runtime below
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [lightboxIndex, festival?.imageUrls?.length]);
+  }, [lightboxIndex]);
 
   if (!festival) {
     return (
@@ -72,12 +71,16 @@ const FestivalDetailPage = () => {
 
   const categoryIcon = categoryIcons[festival.category];
 
+  // Clean and de-duplicate image URLs for display
+  const galleryImages = Array.from(new Set((festival.imageUrls || []).filter(u => typeof u === 'string' && u.trim().length > 0)));
+  console.log('[FestivalDetailPage] galleryImages count:', galleryImages.length);
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Hero Section */}
       <div className="relative h-96">
-        {festival.imageUrls && festival.imageUrls.length > 0 ? (
-          <img src={festival.imageUrls[0]} alt={festival.name} className="absolute inset-0 w-full h-full object-cover" />
+        {galleryImages && galleryImages.length > 0 ? (
+          <img src={galleryImages[0]} alt={festival.name} className="absolute inset-0 w-full h-full object-cover" />
         ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-purple-200 via-blue-200 to-green-200" />
         )}
@@ -144,14 +147,14 @@ const FestivalDetailPage = () => {
             </div>
 
             {/* Gallery */}
-            {festival.imageUrls && festival.imageUrls.length > 0 && (
+            {galleryImages && galleryImages.length > 0 && (
               <div className="bg-white p-8 rounded-xl shadow-sm animate-slide-up hover-lift">
                 <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
                   <Camera className="w-6 h-6 mr-3 text-pink-500" />
                   Festival Gallery
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                  {festival.imageUrls.map((src, idx) => (
+                  {galleryImages.map((src, idx) => (
                     <button
                       key={idx}
                       type="button"
@@ -169,7 +172,7 @@ const FestivalDetailPage = () => {
               </div>
             )}
 
-            {lightboxIndex !== null && festival.imageUrls && festival.imageUrls.length > 0 && (
+            {lightboxIndex !== null && galleryImages && galleryImages.length > 0 && (
               <div className="fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-4" onClick={() => setLightboxIndex(null)}>
                 <button
                   type="button"
@@ -181,21 +184,21 @@ const FestivalDetailPage = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={(e) => { e.stopPropagation(); setLightboxIndex((prev) => (prev - 1 + festival.imageUrls.length) % festival.imageUrls.length); }}
+                  onClick={(e) => { e.stopPropagation(); setLightboxIndex((prev) => (prev - 1 + galleryImages.length) % galleryImages.length); }}
                   className="absolute left-4 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white"
                   aria-label="Previous"
                 >
                   <ChevronLeft className="w-6 h-6" />
                 </button>
                 <img
-                  src={festival.imageUrls[lightboxIndex]}
+                  src={galleryImages[lightboxIndex]}
                   alt={`${festival.name} ${lightboxIndex+1}`}
                   className="max-h-[85vh] w-auto max-w-[90vw] object-contain rounded-lg shadow-lg"
                   onClick={(e) => e.stopPropagation()}
                 />
                 <button
                   type="button"
-                  onClick={(e) => { e.stopPropagation(); setLightboxIndex((prev) => (prev + 1) % festival.imageUrls.length); }}
+                  onClick={(e) => { e.stopPropagation(); setLightboxIndex((prev) => (prev + 1) % galleryImages.length); }}
                   className="absolute right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white"
                   aria-label="Next"
                 >

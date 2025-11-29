@@ -139,7 +139,7 @@ const MapPage = () => {
                     </div>
                     <div className="flex items-center text-yellow-500">
                       <Star className="w-4 h-4 fill-current" />
-                      <span className="ml-1 text-sm font-medium">{festival.rating}</span>
+                      <span className="ml-1 text-sm font-medium">{festival.rating ?? 0}</span>
                     </div>
                   </div>
 
