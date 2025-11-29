@@ -11,8 +11,9 @@ const SUPER_ADMIN_CREDENTIALS = {
 
 export const AdminProvider = ({ children }) => {
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
-  const [festivals, setFestivals] = useState(initialFestivals);
+  const [festivals, setFestivals] = useState(initialFestivals.map(f => ({ ...f, rating: 0 })));
   const [adminLoading, setAdminLoading] = useState(false);
+  const [pendingSubmissions, setPendingSubmissions] = useState([]);
 
   // Check if admin is logged in on app start
   useEffect(() => {
@@ -25,9 +26,20 @@ export const AdminProvider = ({ children }) => {
     const savedFestivals = localStorage.getItem('festivals');
     if (savedFestivals) {
       try {
-        setFestivals(JSON.parse(savedFestivals));
+        const parsed = JSON.parse(savedFestivals);
+        setFestivals(Array.isArray(parsed) ? parsed.map(f => ({ ...f, rating: 0 })) : []);
       } catch (error) {
         console.error('Error loading festivals from localStorage:', error);
+      }
+    }
+
+    // Load pending submissions
+    const savedPending = localStorage.getItem('pendingSubmissions');
+    if (savedPending) {
+      try {
+        setPendingSubmissions(JSON.parse(savedPending));
+      } catch (error) {
+        console.error('Error loading pending submissions:', error);
       }
     }
   }, []);
@@ -36,6 +48,22 @@ export const AdminProvider = ({ children }) => {
   useEffect(() => {
     localStorage.setItem('festivals', JSON.stringify(festivals));
   }, [festivals]);
+
+  useEffect(() => {
+    localStorage.setItem('pendingSubmissions', JSON.stringify(pendingSubmissions));
+  }, [pendingSubmissions]);
+
+  const refreshPendingFromStorage = () => {
+    try {
+      const savedPending = localStorage.getItem('pendingSubmissions');
+      if (savedPending) {
+        const parsed = JSON.parse(savedPending);
+        if (Array.isArray(parsed)) setPendingSubmissions(parsed);
+      }
+    } catch (e) {
+      console.error('Failed to refresh pending submissions from storage', e);
+    }
+  };
 
   const adminLogin = async (username, password) => {
     setAdminLoading(true);
@@ -74,6 +102,58 @@ export const AdminProvider = ({ children }) => {
 
     setFestivals(prev => [...prev, newFestival]);
     return newFestival;
+  };
+
+  // Public user submits a festival for approval
+  const submitFestivalForApproval = (submissionData) => {
+    const pending = {
+      ...submissionData,
+      id: generateSubmissionId(submissionData.name + Date.now()), // Add timestamp to ensure unique ID
+      status: 'pending',
+      submittedAt: new Date().toISOString(),
+      imagePreviews: submissionData.imagePreviews || submissionData.imageUrls || [],
+      imageUrls: submissionData.imageUrls || submissionData.imagePreviews || [],
+      submittedBy: submissionData.submittedBy || 'anonymous'
+    };
+    
+    console.log('[AdminContext] Submitting for approval:', pending);
+    
+    // Get existing submissions from localStorage
+    const existingSubmissions = JSON.parse(localStorage.getItem('pendingSubmissions') || '[]');
+    const updatedSubmissions = [pending, ...existingSubmissions];
+    
+    // Update state and localStorage
+    setPendingSubmissions(updatedSubmissions);
+    localStorage.setItem('pendingSubmissions', JSON.stringify(updatedSubmissions));
+    
+    console.log('Updated pending submissions in localStorage:', updatedSubmissions);
+    return pending;
+  };
+  
+  
+
+  // Super admin approves a pending submission
+  const approveSubmission = (submissionId) => {
+    console.log('[AdminContext] approveSubmission', submissionId);
+    setPendingSubmissions(prev => {
+      const sub = prev.find(p => p.id === submissionId);
+      if (sub) {
+        // Map pending fields to addFestival shape
+        const festivalPayload = {
+          ...sub,
+          imagePreviews: sub.imageUrls && sub.imageUrls.length ? sub.imageUrls : sub.imagePreviews || []
+        };
+        console.log('[AdminContext] approving and publishing', festivalPayload);
+        addFestival(festivalPayload);
+      }
+      return prev.filter(p => p.id !== submissionId);
+    });
+  };
+
+  // Super admin rejects a pending submission
+  const rejectSubmission = (submissionId) => {
+    console.log('[AdminContext] rejectSubmission', submissionId);
+    setPendingSubmissions(prev => prev.filter(p => p.id !== submissionId));
   };
 
   const updateFestival = (festivalId, updatedData) => {
@@ -151,6 +231,11 @@ export const AdminProvider = ({ children }) => {
       .replace(/-+/g, '-');
   };
 
+  const generateSubmissionId = (name) => {
+    const base = generateFestivalId(name || 'festival');
+    return `${base}-${Date.now()}`;
+  };
+
   const value = {
     // Admin Auth
     isAdminLoggedIn,
@@ -166,6 +251,13 @@ export const AdminProvider = ({ children }) => {
     getFestivalById,
     joinFestival,
     addUserRating,
+
+    // Approval workflow
+    pendingSubmissions,
+    submitFestivalForApproval,
+    approveSubmission,
+    rejectSubmission,
+    refreshPendingFromStorage,
 
     // Note: credentials are read from env vars; do not expose secrets here
   };

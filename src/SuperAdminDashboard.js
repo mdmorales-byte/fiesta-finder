@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAdmin } from './AdminContext';
+
 import {
   Plus,
   Edit3,
@@ -18,16 +19,27 @@ import {
 } from 'lucide-react';
 
 const SuperAdminDashboard = () => {
-  const { festivals, deleteFestival, adminLogout, isAdminLoggedIn } = useAdmin();
+  const { festivals, deleteFestival, adminLogout, isAdminLoggedIn, pendingSubmissions, approveSubmission, rejectSubmission, refreshPendingFromStorage } = useAdmin();
+
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [festivalToDelete, setFestivalToDelete] = useState(null);
   const navigate = useNavigate();
 
-  // Redirect if not admin
+  // Ensure we have the latest pending submissions when this page opens
+  useEffect(() => {
+    refreshPendingFromStorage();
+  }, [refreshPendingFromStorage]);
+
+  // Redirect if not admin (must be inside a hook to avoid conditional hooks issue)
+  useEffect(() => {
+    if (!isAdminLoggedIn) {
+      navigate('/admin/login', { replace: true });
+    }
+  }, [isAdminLoggedIn, navigate]);
+
   if (!isAdminLoggedIn) {
-    navigate('/admin/login');
     return null;
   }
 
@@ -66,6 +78,7 @@ const SuperAdminDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -99,6 +112,7 @@ const SuperAdminDashboard = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
           <div className="bg-white rounded-lg shadow-sm p-6">
@@ -196,6 +210,64 @@ const SuperAdminDashboard = () => {
               Add Festival
             </button>
           </div>
+        </div>
+
+        {/* Pending Submissions */}
+        <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-8">
+          <div className="px-6 py-4 border-b flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900">Pending Submissions</h2>
+            <span className="text-sm text-gray-500">{pendingSubmissions.length} pending</span>
+          </div>
+          {pendingSubmissions.length === 0 ? (
+            <div className="p-6 text-sm text-gray-600">No pending submissions.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Festival</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Images</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {pendingSubmissions.map((sub) => (
+                    <tr key={sub.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{sub.name}</div>
+                        <div className="text-xs text-gray-500">{sub.id}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{sub.category || 'N/A'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{sub.location || 'N/A'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex -space-x-2 overflow-hidden">
+                          {(sub.imageUrls || sub.imagePreviews || []).slice(0,3).map((img, idx) => (
+                            <img key={idx} src={img} alt="" className="inline-block h-8 w-8 rounded object-cover ring-2 ring-white" />
+                          ))}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                        <button
+                          onClick={() => approveSubmission(sub.id)}
+                          className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => rejectSubmission(sub.id)}
+                          className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
+                        >
+                          Reject
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {/* Festivals Table */}

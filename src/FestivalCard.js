@@ -78,12 +78,8 @@ const FestivalCard = ({ festival }) => {
 
       <div className="px-4 pb-4 flex items-center justify-between">
         <div className="flex items-center">
-          {festival.rating && (
-            <>
-              <Star className="w-4 h-4 text-yellow-400 fill-current animate-pulse-slow" />
-              <span className="ml-1 text-sm font-medium text-gray-700">{festival.rating}</span>
-            </>
-          )}
+          <Star className="w-4 h-4 text-yellow-400 fill-current animate-pulse-slow" />
+          <span className="ml-1 text-sm font-medium text-gray-700">{(festival.rating ?? 0)}</span>
         </div>
         <Link
           to={`/festival/${festival.id}`}
